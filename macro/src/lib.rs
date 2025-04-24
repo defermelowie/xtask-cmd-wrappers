@@ -1,156 +1,192 @@
+use darling::{ast::NestedMeta, FromMeta};
 use itertools::Itertools;
 use proc_macro::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{format_ident, quote};
 use syn::{
-    parse::{Parse, ParseStream},
-    parse_macro_input, parse_quote, Field, Ident, ImplItemFn, ItemStruct};
-use darling::FromMeta;
+    parse_macro_input, parse_quote, ExprMethodCall, Field, FnArg, Ident, ImplItemFn, ItemImpl,
+    ItemStruct,
+};
 
-#[proc_macro_attribute]
-pub fn command(attr: TokenStream, input: TokenStream) -> TokenStream {
-    // TODO: Parse the top level attribute
-
-    // Parse the input as Struct
-    let struct_ = parse_macro_input!(input as ItemStruct);
-    let struct_name = struct_.ident;
-
-    // Loop over struct fields
-    let mut setters = Vec::new();
-    for field in struct_.fields.iter() {
-        // Get field's identifier (name)
-        let field_ident = field
-            .ident
-            .as_ref()
-            .expect("Only structs with named fields can represent commands");
-
-        // Extract field's type
-        let field_type = &(field.ty);
-
-        // Extract field's docstring
-        let field_docstring = field.attrs.iter().find(|a| a.path().is_ident("doc"));
-
-        // Extract field's #[arg(...)] attribute
-        let arg_chain = match field.attrs.iter().find(|a| a.path().is_ident("arg")) {
-            Some(a) => match a.parse_args::<Ident>().unwrap().to_string().as_str() {
-                "single" => quote! {.arg(concat!("-", stringify!(#field_ident))) },
-                "double" => quote! {.arg(concat!("--", stringify!(#field_ident))) },
-                _ => panic!("Only #[arg(single)] and #[arg(double)] are allowed"),
-            },
-            None => TokenStream::new().into(),
-        };
-
-        // DEBUG: try to check if bool
-        let setter: ImplItemFn = if field_type == &(parse_quote! { bool }) {
-            parse_quote! {
-                    #field_docstring
-                    pub fn #field_ident(&mut self) -> &mut Self {
-                        self.0#arg_chain;
-                        self
-                    }
-            }
-        } else {
-            parse_quote! {
-                    #field_docstring
-                    pub fn #field_ident(&mut self, val: #field_type) -> &mut Self {
-                        self.0#arg_chain.arg(val);
-                        self
-                    }
-            }
-        };
-
-        setters.push(setter);
-    }
-
-    // Create expanded code
-    let expanded = quote! {
-        struct #struct_name(std::process::Command);
-
-        impl #struct_name {
-            #(#setters)*
-        }
-    };
-
-    TokenStream::from(expanded)
+/// Meta items for `#[cmd(...)]`
+#[derive(Debug, FromMeta)]
+struct CmdMeta {
+    #[darling(default)]
+    name: Option<String>,
 }
 
+/// The default prefix of a command argument.
+///
+/// i.e. the "--" in `ls --version`
+fn default_prefix() -> String {
+    "--".to_string()
+}
+
+/// Meta items for #[cmd::opt(...)]
 #[derive(Debug, FromMeta)]
 struct CmdOptMeta {
-    flag: bool,
+    #[darling(default)]
+    no_val: bool,
+
+    #[darling(default)]
+    no_opt: bool,
 
     #[darling(default)]
     name: Option<String>,
 
+    #[darling(default=default_prefix)]
     prefix: String,
 }
 
-#[proc_macro_attribute]
-pub fn command2(attr: TokenStream, input: TokenStream) -> TokenStream {
-    // TODO: Parse top level attributes
-    let _attr = attr;
-
-    // Parse the input as Struct
-    let item = parse_macro_input!(input as ItemStruct);
-    let name = &(item.ident);
-
-    // Create constructor
-    let program = name.to_string();
-    let constructor: ImplItemFn = parse_quote! {
-        pub fn new() -> Self {
-            Self(std::process::Command::new(#program))
+/// Generate the constructor for a [std::process::Command] wrapper with a fixed `program` parameter.
+fn constructor(ident: &Ident, program: String) -> ImplItemFn {
+    parse_quote! {
+        pub fn new() -> #ident {
+            #ident(std::process::Command::new(#program))
         }
-    };
-
-    // Extract setters
-    let setters = item.fields.iter().map(|f| field_to_setter(f)).collect_vec();
-
-    // Generate expanded code
-    let expanded = quote! {
-        struct #name(std::process::Command);
-        impl #name {
-            #constructor
-            #(#setters)*
-        }
-    };
-
-    TokenStream::from(expanded)
+    }
 }
 
-/// Convert the field of a command struct to it's setter
-fn field_to_setter(field: &Field) -> ImplItemFn {
-    // Destruct field info
+/// Convert the field of a command struct to it's setterI
+fn setter(field: &Field) -> ImplItemFn {
+    // Destruct generic field info
     let ident = field.ident.as_ref().unwrap();
     let ty = &(field.ty);
     let doc_attr = field.attrs.iter().find(|a| a.path().is_ident("doc"));
     let arg_attr = field.attrs.iter().find(|a| a.path().is_ident("arg"));
 
-    // Update options from #[arg(...)] attribute
-    let arg_meta: ArgsAttrMeta = if let Some(attr) = arg_attr {
-        match deluxe::parse(attr.to_token_stream().into()) {
-            Ok(parsed) => parsed,
-            Err(e) => panic!("Could not parse #[arg(...)]: {}", e),
-        }
+    // Parse meta items of #[arg(...)]
+    let cmd_opt;
+    let mut errors = proc_macro2::TokenStream::new();
+    if let Some(a) = arg_attr {
+        cmd_opt = CmdOptMeta::from_meta(&a.meta)
+            .map_err(|e| errors = e.write_errors())
+            .ok();
     } else {
-        ArgsAttrMeta {
-            flag: false,
-            name: Some(ident.to_string().to_lowercase()),
-            prefix: "--".to_string(),
-        }
+        cmd_opt = None;
+        errors = quote! {compile_error!(concat!("Missing #[arg(...)] attribute on field: ", stringify!(#ident)))};
+    }
+    // FIXME: Check that no_val and no_opt aren't both set
+
+    // Generate dummy function on error
+    if !errors.is_empty() {
+        let dummy_ident = format_ident!("{}_err", ident);
+        return parse_quote! {
+            pub fn #dummy_ident() {
+                #errors
+            }
+        };
+    }
+
+    // No error: generate code from options
+    let cmd_opt = cmd_opt.unwrap();
+    let opt_prefix = cmd_opt.prefix;
+    let opt_name: String = match cmd_opt.name {
+        Some(s) => s,
+        None => ident.to_string().to_lowercase(),
+    };
+    let opt = format!("{}{}", opt_prefix, opt_name);
+    let param_val: Option<FnArg> = match cmd_opt.no_val {
+        true => None,
+        false => Some(parse_quote! {val: #ty}),
+    };
+    let arg_val: Option<ExprMethodCall> = match cmd_opt.no_val {
+        true => None,
+        false => Some(parse_quote! {self.0.arg(val)}),
+    };
+    let arg_opt: Option<ExprMethodCall> = match cmd_opt.no_opt {
+        true => None,
+        false => Some(parse_quote! {self.0.arg(#opt)}),
     };
 
-    // Generate setter code
-    if arg_meta.flag {
-        parse_quote! {
-            #doc_attr
-            pub fn #ident(&mut self) -> &mut Self {
-                todo!("Set flag options");
-            }
+    // Generate setter function
+    parse_quote! {
+        #doc_attr
+        pub fn #ident(&mut self, #param_val) -> &mut Self {
+            #arg_opt;
+            #arg_val;
+            self
         }
-    } else {
-        parse_quote! {
-            #doc_attr
-            pub fn #ident(&mut self, val: #ty) -> &mut Self {
-                todo!("Set value options");
+    }
+}
+
+/// Get string representation of command
+fn string_repr() -> ImplItemFn {
+    parse_quote! {
+        pub fn string_repr(&self) -> String {
+            let program = self.0.get_program().to_string_lossy();
+            let args = self.0
+                .get_args()
+                .map(|a| a.to_string_lossy())
+                .fold(String::new(), |s, a| s + " " + &a);
+            format!("{}{}", program, args)
+        }
+    }
+}
+
+fn get_inner() -> ImplItemFn {
+    parse_quote! {
+        pub fn cmd(self) -> std::process::Command {
+            self.0
+        }
+    }
+}
+
+/// Implementation of [Into<std::process::Command>]
+fn into_std_command(ident: &Ident) -> ItemImpl {
+    parse_quote! {
+        impl Into<std::process::Command> for #ident {
+            fn into(self) -> std::process::Command {
+                self.cmd()
             }
         }
     }
+}
+
+#[proc_macro_attribute]
+pub fn cmd(attr: TokenStream, input: TokenStream) -> TokenStream {
+    // Parse top level attributes
+    let attr = match NestedMeta::parse_meta_list(attr.into()) {
+        Ok(v) => v,
+        Err(e) => return TokenStream::from(e.into_compile_error()),
+    };
+    let attr = match CmdMeta::from_list(&attr) {
+        Ok(v) => v,
+        Err(e) => return TokenStream::from(e.write_errors()),
+    };
+
+    // Parse the input as Struct
+    let item = parse_macro_input!(input as ItemStruct);
+
+    // Extract useful info
+    let ident = &(item.ident);
+    let name = attr.name.unwrap_or(ident.to_string().to_lowercase());
+
+    // Create constructor
+    let constructor = constructor(ident, name);
+
+    // Extract setters
+    let setters = item.fields.iter().map(|f| setter(f)).collect_vec();
+
+    // Create string representation function
+    let string_repr = string_repr();
+
+    // Create getter for inner command item
+    let inner = get_inner();
+
+    // Generate Into<std::process::Command> trait
+    let into_std_command = into_std_command(ident);
+
+    // Generate expanded code
+    let expanded = quote! {
+        struct #ident(std::process::Command);
+        impl #ident {
+            #constructor
+            #inner
+            #(#setters)*
+            #string_repr
+        }
+        #into_std_command
+    };
+
+    TokenStream::from(expanded)
 }
