@@ -160,6 +160,7 @@ pub fn cmd(attr: TokenStream, input: TokenStream) -> TokenStream {
     // Extract useful info
     let ident = &(item.ident);
     let name = attr.name.unwrap_or(ident.to_string().to_lowercase());
+    let vis = &(item.vis);
 
     // Create constructor
     let constructor = constructor(ident, name);
@@ -178,7 +179,7 @@ pub fn cmd(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     // Generate expanded code
     let expanded = quote! {
-        struct #ident(std::process::Command);
+        #vis struct #ident(std::process::Command);
         impl #ident {
             #constructor
             #inner

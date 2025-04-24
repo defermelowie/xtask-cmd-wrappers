@@ -1,6 +1,10 @@
 [package]
-name = "cmd-wrappers-macro"
-edition = "2021"
+name = "xtask-cmdwrap-macro"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+authors.workspace = true
 
 [lib]
 proc-macro = true
@@ -10,4 +14,4 @@ darling = "0.20.11"
 itertools = "0.14.0"
 proc-macro2 = "1.0.95"
 quote = "1.0.40"
-syn = { version = "2.0.100", features = ["extra-traits", "full"] }
+syn = { version = "2.0.100", features = ["full"] }

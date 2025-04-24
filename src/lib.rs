@@ -1,4 +1,5 @@
-pub use cmd_wrappers_macro::cmd as command;
+pub use xtask_cmdwrap_macro::cmd as command;
 
 // TODO: guard behind feature flags
-mod make;
+#[cfg(feature = "make")]
+pub mod make;

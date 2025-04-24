@@ -1,9 +1,8 @@
 //! Wrapper for GNU make
-
 use crate::command;
 
 #[command]
-struct Make {
+pub struct Make {
     /// Change to DIRECTORY before doing anything.
     #[arg(prefix="-", name="C")]
     directory: String,

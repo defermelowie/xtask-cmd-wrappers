@@ -1,11 +1,21 @@
 [workspace]
 members = ["macro"]
+package.edition = "2021"
+package.version = "0.1.0"
+package.license = "MIT"
+package.readme = "readme.md"
+package.authors = ["Lowie Deferme <lowie.deferme@kuleuven.be>"]
 
 [package]
-name = "cmd-wrappers"
-version = "0.1.0"
-authors = ["Lowie Deferme <lowie.deferme@kuleuven.be>"]
-edition = "2021"
+name = "xtask-cmdwrap"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+authors.workspace = true
 
 [dependencies]
-cmd-wrappers-macro = {path = "macro"}
+xtask-cmdwrap-macro = { path = "macro", version = "*"}
+
+[features]
+make = []
