@@ -1,0 +1,11 @@
+[workspace]
+members = ["macro"]
+
+[package]
+name = "cmd-wrappers"
+version = "0.1.0"
+authors = ["Lowie Deferme <lowie.deferme@kuleuven.be>"]
+edition = "2021"
+
+[dependencies]
+cmd-wrappers-macro = {path = "macro"}
