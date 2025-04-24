@@ -1,5 +1,6 @@
 [package]
 name = "xtask-cmdwrap-macro"
+description = "Procedural macros for xtask-cmdwrap"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

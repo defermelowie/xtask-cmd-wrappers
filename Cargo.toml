@@ -8,6 +8,7 @@ package.authors = ["Lowie Deferme <lowie.deferme@kuleuven.be>"]
 
 [package]
 name = "xtask-cmdwrap"
+description = "A thin wrapper around std::process::Command for xtask style projects"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
