@@ -20,7 +20,7 @@ categories.workspace = true
 repository.workspace = true
 
 [dependencies]
-xtask-cmdwrap-macro = { path = "macro", version = "*"}
+xtask-cmdwrap-macro = { path = "macro", version = "0.1.0"}
 
 [features]
 make = []
