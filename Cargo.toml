@@ -5,6 +5,8 @@ package.version = "0.1.0"
 package.license = "MIT"
 package.readme = "readme.md"
 package.authors = ["Lowie Deferme <lowie.deferme@kuleuven.be>"]
+package.categories = ["development-tools::build-utils"]
+package.repository = "https://github.com/defermelowie/xtask-cmdwrap"
 
 [package]
 name = "xtask-cmdwrap"
@@ -14,6 +16,8 @@ edition.workspace = true
 license.workspace = true
 readme.workspace = true
 authors.workspace = true
+categories.workspace = true
+repository.workspace = true
 
 [dependencies]
 xtask-cmdwrap-macro = { path = "macro", version = "*"}
