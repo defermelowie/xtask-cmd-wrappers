@@ -166,7 +166,7 @@ pub fn cmd(attr: TokenStream, input: TokenStream) -> TokenStream {
     let constructor = constructor(ident, name);
 
     // Extract setters
-    let setters = item.fields.iter().map(|f| setter(f)).collect_vec();
+    let setters = item.fields.iter().map(setter).collect_vec();
 
     // Create string representation function
     let string_repr = string_repr();
