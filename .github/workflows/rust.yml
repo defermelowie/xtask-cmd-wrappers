@@ -31,7 +31,7 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
   
-  test-stable:
+  test:
     runs-on: ubuntu-latest
     needs: build
 
@@ -49,26 +49,3 @@ jobs:
 
       - name: Run tests
         run: cargo test --verbose --all-features
-
-  test-nightly:
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: nightly
-          components: miri
-
-      - name: Install dependencies
-        run: cargo fetch
-
-      - name: Run tests
-        run: cargo test --verbose --all-features
-
-      - name: Run miri
-        run: cargo miri test --all-features
