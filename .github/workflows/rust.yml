@@ -30,13 +30,10 @@ jobs:
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
-
-  test:
+  
+  test-stable:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        rust: [stable, nightly]
+    needs: build
 
     steps:
       - name: Checkout code
@@ -45,8 +42,26 @@ jobs:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: ${{ matrix.rust }}
-          if: ${{ matrix.rust == 'nightly' }}
+          toolchain: stable
+
+      - name: Install dependencies
+        run: cargo fetch
+
+      - name: Run tests
+        run: cargo test --verbose --all-features
+
+  test-nightly:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
           components: miri
 
       - name: Install dependencies
@@ -56,5 +71,4 @@ jobs:
         run: cargo test --verbose --all-features
 
       - name: Run miri
-        if: ${{ matrix.rust == 'nightly' }}
         run: cargo miri test --all-features
