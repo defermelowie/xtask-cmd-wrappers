@@ -46,6 +46,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
+          components: miri
 
       - name: Install dependencies
         run: cargo fetch
