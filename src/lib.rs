@@ -66,7 +66,7 @@ mod test {
     #[test]
     fn test_args() {
         let mut cmd = StdCommand::new("echo");
-        let args = vec!["hello", "world"];
+        let args = ["hello", "world"];
         cmd.args(args.iter());
         assert_eq!(cmd.get_program().to_string_lossy(), "echo");
         assert_eq!(cmd.get_args().next().unwrap().to_string_lossy(), "hello");
@@ -92,7 +92,7 @@ mod test {
     #[test]
     fn test_args_if() {
         let mut cmd = StdCommand::new("echo");
-        let args = vec!["hello", "world"];
+        let args = ["hello", "world"];
         cmd.args_if(args.iter(), |arg| arg.to_string().starts_with("h"));
         assert_eq!(cmd.get_program().to_string_lossy(), "echo");
         assert_eq!(cmd.get_args().next().unwrap().to_string_lossy(), "hello");
